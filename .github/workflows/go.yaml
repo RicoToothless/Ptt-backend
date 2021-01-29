@@ -29,7 +29,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
       - name: Linting & vetting.
-        run: ./make.bash lint
+        run: |
+          whoami
+          ls -al make.bash
+          ./make.bash lint
   test:
     strategy:
       matrix:
