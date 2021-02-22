@@ -5,74 +5,48 @@ on:
     types: [created]
 
 jobs:
-  # lint:
-  #   strategy:
-  #     matrix:
-  #       platform: [ubuntu-20.04]
-  #       go-version: [1.14.x]
-  #   runs-on: ${{ matrix.platform }}
-  #   name: Linters (Static Analysis) for Go
-  #   env:
-  #     GOBIN: /tmp/.bin
-  #   steps:
-  #     - name: Checkout code into the Go module directory.
-  #       uses: actions/checkout@v2
-
-  #     - name: Install Go
-  #       uses: actions/setup-go@v2
-  #       with:
-  #         go-version: ${{ matrix.go-version }}
-
-  #     - uses: actions/cache@v1
-  #       with:
-  #         path: ~/go/pkg/mod
-  #         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-
-  #     - name: Linting & vetting.
-  #       run: ./make.bash lint
-
-  deploy-check:
-    runs-on: ubuntu-20.04
+  deploy:
+    name: Deploy branch
+    runs-on: ubuntu-latest
     steps:
-      - name: acknowledge deployment request to commenter
-        id: check
-        uses: khan/pull-request-comment-trigger@master
+      - name: Create deployment
+        id: create_deployment
+        uses: alexjurkiewicz/pr-comment-github-deployment@master
         with:
-          trigger: "rebuild"
-    outputs:
-      triggered: ${{ steps.check.outputs.triggered }}
+          trigger_phrase: "/deploy"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  test:
-    needs: deploy-check
-    if: needs.deploy-check.outputs.triggered == 'true'
-    strategy:
-      matrix:
-        platform: [ubuntu-20.04, macos-latest, windows-latest]
-        go-version: [1.14.x]
-    runs-on: ${{ matrix.platform }}
-    name: integration tests
-    env:
-      GOBIN: /tmp/.bin
-    steps:
-      - name: Install Go.
-        uses: actions/setup-go@v1
+      - name: Set deployment status to in progress
+        id: start_deployment
+        uses: octokit/request-action@v2.x
         with:
-          go-version: ${{ matrix.go-version }}
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ steps.create_deployment.outputs.deployment_id }}
+          environment_url: https://example.com
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          state: in_progress
+          mediaType: '{"previews": ["flash", "ant-man"]}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: Check out code into the Go module directory.
-        uses: actions/checkout@v2
-
-      - uses: actions/cache@v1
+      - name: deploy the pull request
+        run: |
+          # deployment logic goes here
+          sleep 30
+          # always succeed
+          exit 0
+      - name: set deployment status to success
+        id: successful_deployment
+        uses: octokit/request-action@v2.x
         with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-
-      # - name: Run tests
-      #   run: ./make.bash test-integration
-      - name: test
-        run: go test -v ./...
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v1
-        with:
-          file: coverage.out
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ steps.create_deployment.outputs.deployment_id }}
+          environment_url: https://example.com
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          mediaType: '{"previews": ["ant-man"]}'
+          state: success
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
