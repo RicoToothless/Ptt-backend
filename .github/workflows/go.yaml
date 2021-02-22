@@ -32,23 +32,44 @@ jobs:
 
   #     - name: Linting & vetting.
   #       run: ./make.bash lint
-  deploy-check:
+
+  hello:
     runs-on: ubuntu-latest
     steps:
-      - name: acknowledge deployment request to commenter
+      - uses: khan/pull-request-comment-trigger@master
         id: check
-        uses: khan/pull-request-comment-trigger@master
         with:
-          trigger: "/deploy"
+          trigger: '#hello'
+      - run: 'echo Found it!'
+        if: steps.check.outputs.triggered == 'true'
+
+  eyes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        id: check
+        with:
+          trigger: '#look'
+          reaction: eyes
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      - run: 'echo Found it!'
+        if: steps.check.outputs.triggered == 'true'
+
+  rocket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        id: check
+        with:
+          trigger: '#deploy'
           reaction: rocket
         env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-    outputs:
-      triggered: ${{ steps.check.outputs.triggered }}
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+      - run: 'echo Found it!'
+        if: steps.check.outputs.triggered == 'true'
 
   test:
-    needs: deploy-check
-    if: needs.deploy-check.outputs.triggered == 'true'
     strategy:
       matrix:
         platform: [ubuntu-20.04, macos-latest, windows-latest]
