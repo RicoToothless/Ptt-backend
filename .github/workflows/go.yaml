@@ -39,7 +39,10 @@ jobs:
         id: check
         uses: khan/pull-request-comment-trigger@master
         with:
-          trigger: "deploy"
+          trigger: "/deploy"
+          reaction: rocket
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
     outputs:
       triggered: ${{ steps.check.outputs.triggered }}
 
