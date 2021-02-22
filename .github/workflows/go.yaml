@@ -53,6 +53,9 @@ jobs:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
+      - name: Ensures go.mod and go.sum for dependencies
+        run: go mod verify
+
       # - name: Run tests
       #   run: ./make.bash test-integration
       - name: test
