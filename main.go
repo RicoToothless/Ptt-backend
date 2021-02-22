@@ -1,111 +1,41 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strings"
+	"github.com/Ptt-official-app/Ptt-backend/internal/config"
+	"github.com/Ptt-official-app/Ptt-backend/internal/delivery/http"
+	"github.com/Ptt-official-app/Ptt-backend/internal/logging"
+	"github.com/Ptt-official-app/Ptt-backend/internal/repository"
+	"github.com/Ptt-official-app/Ptt-backend/internal/usecase"
 
 	"github.com/PichuChen/go-bbs"
 	_ "github.com/PichuChen/go-bbs/pttbbs"
-	"github.com/Ptt-official-app/Ptt-backend/internal/logging"
 )
 
-var userRecs []bbs.UserRecord
-var boardHeader []bbs.BoardRecord
-
-var db *bbs.DB
-var logger = logging.NewLogger()
-
 func main() {
+	var logger = logging.NewLogger()
+
 	logger.Informationalf("server start")
 
-	loadDefaultConfig()
-	var err error
-	db, err = bbs.Open("pttbbs", globalConfig.BBSHome)
+	globalConfig, err := config.NewDefaultConfig()
+	if err != nil {
+		logger.Errorf("failed to get config: %v", err)
+		return
+	}
+
+	db, err := bbs.Open("pttbbs", globalConfig.BBSHome)
 	if err != nil {
 		logger.Errorf("open bbs db error: %v", err)
 		return
 	}
 
-	loadPasswdsFile()
-	loadBoardFile()
-
-	r := http.NewServeMux()
-	buildRoute(r)
-
-	logger.Informationalf("listen port on %v", globalConfig.ListenPort)
-	err = http.ListenAndServe(fmt.Sprintf(":%v", globalConfig.ListenPort), r)
+	repo, err := repository.NewRepository(db)
 	if err != nil {
-		logger.Errorf("listen serve error: %v", err)
-	}
-}
-
-func loadPasswdsFile() {
-	var err error
-	userRecs, err = db.ReadUserRecords()
-	if err != nil {
-		logger.Errorf("get user rec error: %v", err)
+		logger.Errorf("failed to create user repository: %s\n", err)
 		return
 	}
-}
-
-func loadBoardFile() {
-	var err error
-	boardHeader, err = db.ReadBoardRecords()
-	if err != nil {
-		logger.Errorf("get board header error: %v", err)
-		return
+	usecase := usecase.NewUsecase(globalConfig, repo)
+	httpDelivery := http.NewHTTPDelivery(usecase)
+	if err := httpDelivery.Run(globalConfig.ListenPort); err != nil {
+		logger.Errorf("run http delivery error: %s\n", err)
 	}
-	for index, board := range boardHeader {
-		logger.Debugf("loaded %d %v", index, board.BoardId())
-
-	}
-}
-
-func routeClass(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		getClass(w, r)
-		return
-	}
-
-}
-
-func getClass(w http.ResponseWriter, r *http.Request) {
-
-	seg := strings.Split(r.URL.Path, "/")
-
-	classId := "0"
-	if len(seg) > 2 {
-		classId = seg[3]
-	}
-	logger.Informationalf("user get class: %v", classId)
-
-	list := []interface{}{}
-
-	c := map[string]interface{}{
-		"id":             1,
-		"type":           "class",
-		"title":          "title",
-		"number_of_user": 3,
-		"moderators": []string{
-			"SYSOP",
-			"pichu",
-		},
-	}
-	list = append(list, c)
-
-	m := map[string]interface{}{
-		"data": list,
-	}
-	b, _ := json.MarshalIndent(m, "", "  ")
-
-	w.Write(b)
-
-}
-
-// return a boolean value to indicate support guest account
-// and using guset permission when permission insufficient
-func supportGuest() bool {
-	return false
 }
